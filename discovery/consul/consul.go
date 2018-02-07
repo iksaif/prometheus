@@ -32,6 +32,7 @@ import (
 )
 
 const (
+	watchInterval = 15 * time.Second
 	watchTimeout  = 30 * time.Second
 	retryInterval = 15 * time.Second
 
@@ -154,8 +155,9 @@ func (d *Discovery) Run(ctx context.Context, ch chan<- []*config.TargetGroup) {
 		catalog := d.client.Catalog()
 		t0 := time.Now()
 		srvs, meta, err := catalog.Services(&consul.QueryOptions{
-			WaitIndex: lastIndex,
-			WaitTime:  watchTimeout,
+			WaitIndex:  lastIndex,
+			WaitTime:   watchTimeout,
+			AllowStale: true,
 		})
 		rpcDuration.WithLabelValues("catalog", "services").Observe(time.Since(t0).Seconds())
 
@@ -232,6 +234,7 @@ func (d *Discovery) Run(ctx context.Context, ch chan<- []*config.TargetGroup) {
 				}
 			}
 		}
+		time.Sleep(watchInterval)
 	}
 }
 
@@ -251,8 +254,9 @@ func (srv *consulService) watch(ctx context.Context, ch chan<- []*config.TargetG
 	for {
 		t0 := time.Now()
 		nodes, meta, err := catalog.Service(srv.name, "", &consul.QueryOptions{
-			WaitIndex: lastIndex,
-			WaitTime:  watchTimeout,
+			WaitIndex:  lastIndex,
+			WaitTime:   watchTimeout,
+			AllowStale: true,
 		})
 		rpcDuration.WithLabelValues("catalog", "service").Observe(time.Since(t0).Seconds())
 
@@ -326,5 +330,6 @@ func (srv *consulService) watch(ctx context.Context, ch chan<- []*config.TargetG
 			return
 		case ch <- []*config.TargetGroup{&tgroup}:
 		}
+		time.Sleep(watchInterval)
 	}
 }
